@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>隊伍DMG計算</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        input, select, button {
+            padding: 8px;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>隊伍DMG計算</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>隊員</th>
+                    <th>種族</th>
+                    <th>位階</th>
+                    <th>裝備</th>
+                    <th>技能</th>
+                    <th>異常狀態</th>
+                    <th>無法行動</th>
+                    <th>擲骰點數</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="playerInputs">
+                <!-- 玩家輸入行將動態生成 -->
+            </tbody>
+        </table>
+        <button onclick="addPlayerRow()">新增玩家</button>
+        <button onclick="calculateDamage()">計算DMG</button>
+
+        <h3>結果</h3>
+        <div id="results"></div>
+    </div>
+
+    <script>
+        const raceModifiers = {
+            "人類": { self: 1, team: 1, abnormal: 3 },
+            "精靈": { self: 1, team: 1.5, abnormal: 1 },
+            "獸耳族": { self: 1.2, team: 1, abnormal: 1 },
+            "魔物族": { self: 1, team: 1, abnormal: 1 },
+            "僕從": { self: 1, team: 1, abnormal: 1 }  // 僕從的種族加成
+        };
+
+        const Rank = {
+            "銅級",
+            "鐵級",
+            "銀級",
+        };
+
+        const equipmentModifiers = {
+            "無": { base: 0, multiplier: 1, negative: 1 },
+            "哥布林的武器": { base: 50, multiplier: 1, negative: 1 },
+            "詛咒盔甲": { base: 0, multiplier: 1, negative: 3 },
+            "雙子劍": { base: 200, multiplier: 1, negative: 1 }
+        };
+
+        const skills = {
+            "無": { damage: 0, multiplier: 1 },
+            "必殺技": { damage: 1000, multiplier: 1 },
+            "戰鬥精通": { damage: 100, multiplier: 1 },
+            "輔助精通": { damage: 0, multiplier: 1.5 },
+            "擊落（吉）": { damage: 200, multiplier: 1 },
+            "擊落（大吉）": { damage: 1000, multiplier: 1 }
+        };
+
+        function addPlayerRow() {
+            const tbody = document.getElementById("playerInputs");
+            const row = document.createElement("tr");
+
+            row.innerHTML = `
+                <td><input type="text" placeholder="玩家名稱"></td>
+                <td>
+                    <select onchange="checkServant(this)">
+                        <option value="人類">人類</option>
+                        <option value="精靈">精靈</option>
+                        <option value="獸耳族">獸耳族</option>
+                        <option value="魔物族">魔物族</option>
+                        <option value="僕從">僕從</option>  <!-- 新增僕從選項 -->
+                    </select>
+                </td>
+                <td>
+                    <select>
+                        <option value="無">無</option>
+                        <option value="哥布林的武器">哥布林的武器</option>
+                        <option value="詛咒盔甲">詛咒盔甲</option>
+                        <option value="雙子劍">雙子劍</option>
+                    </select>
+                </td>
+                <td>
+                    <select>
+                        <option value="無">無</option>
+                        <option value="必殺技">必殺技</option>
+                        <option value="戰鬥精通">戰鬥精通</option>
+                        <option value="輔助精通">輔助精通</option>
+                        <option value="擊落（吉）">擊落（吉）</option>
+                        <option value="擊落（大吉）">擊落（大吉）</option>
+                    </select>
+                </td>
+                <td><input type="checkbox"></td>
+                <td><input type="checkbox"></td>
+                <td><input type="number" min="0" placeholder="擲骰點數"></td>
+                <td><button onclick="deletePlayerRow(this)">刪除</button></td>
+            `;
+            tbody.appendChild(row);
+        }
+
+        function deletePlayerRow(button) {
+            button.parentElement.parentElement.remove();
+        }
+
+        function checkServant(select) {
+            const row = select.closest("tr");
+            const skillSelect = row.querySelector("td:nth-child(4) select");
+            const race = select.value;
+
+            // 如果選擇了僕從，僅能使用僕從技能
+            if (race === "僕從") {
+                skillSelect.innerHTML = `
+                    <option value="無">無</option>
+                    <option value="必殺技">必殺技</option>
+                    <option value="戰鬥精通">戰鬥精通</option>
+                    <option value="輔助精通">輔助精通</option>
+                    <option value="擊落（吉）">擊落（吉）</option>
+                    <option value="擊落（大吉）">擊落（大吉）</option>
+                `;
+            } else {
+                skillSelect.innerHTML = `
+                    <option value="無">無</option>
+                    <option value="必殺技">必殺技</option>
+                    <option value="戰鬥精通">戰鬥精通</option>
+                    <option value="輔助精通">輔助精通</option>
+                    <option value="擊落（吉）">擊落（吉）</option>
+                    <option value="擊落（大吉）">擊落（大吉）</option>
+                `;
+            }
+        }
+
+        function calculateDamage() {
+            const rows = document.querySelectorAll("#playerInputs tr");
+            let totalDamage = 0;
+            const resultsDiv = document.getElementById("results");
+            resultsDiv.innerHTML = "";
+
+            rows.forEach(row => {
+                const name = row.children[0].querySelector("input").value || "無名";
+                const race = row.children[1].querySelector("select").value;
+                const equipment = row.children[2].querySelector("select").value;
+                const skill = row.children[3].querySelector("select").value;
+                const abnormal = row.children[4].querySelector("input").checked;
+                const inactive = row.children[5].querySelector("input").checked;
+                const baseRoll = parseInt(row.children[6].querySelector("input").value) || 0;
+
+                if (inactive) {
+                    resultsDiv.innerHTML += `<p>${name} 無法行動，DMG為 0。</p>`;
+                    return;
+                }
+
+                if (race === "僕從" && !skill.includes("僕從")) {
+                    resultsDiv.innerHTML += `<p>${name} 為僕從，無法使用非僕從技能，DMG為 0。</p>`;
+                    return;
+                }
+
+                let damage = baseRoll;
+                damage += equipmentModifiers[equipment].base;
+                damage *= equipmentModifiers[equipment].multiplier;
+                damage *= raceModifiers[race].self;
+                if (abnormal) damage *= raceModifiers[race].abnormal;
+                damage += skills[skill].damage;
+                damage *= skills[skill].multiplier;
+
+                // 隊友種族加成
+                const teamBonus = raceModifiers[race].team;
+                damage += (baseRoll * teamBonus) - baseRoll;
+
+                damage = Math.floor(damage); // 忽略小數點
+                totalDamage += damage;
+
+                resultsDiv.innerHTML += `<p>${name} 的DMG為 ${damage}。</p>`;
+            });
+
+            resultsDiv.innerHTML += `<h4>隊伍總DMG：${totalDamage}</h4>`;
+        }
+    </script>
+</body>
+</html>
+
